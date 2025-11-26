@@ -38,7 +38,7 @@ app.use('/api/packages', packageRoutes);
 app.use('/api/categories', categoryRoutes);
 
 app.get("/", (req, res) => {
-    res.send("Hello World!");
+    res.send("jh Website is running");
 });
 
 app.use(errorHandler);
