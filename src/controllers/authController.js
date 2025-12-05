@@ -1,7 +1,7 @@
 
 import { registerUser, loginUser, forgotPassword, changePassword, logoutUser } from "../services/authService.js";
 import { logger } from "../config/logger.js";
-
+import User from "../models/User.js";
 export const register = async (req, res, next) => {
     try {
         const result = await registerUser(req.body);
