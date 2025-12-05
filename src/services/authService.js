@@ -11,6 +11,7 @@ export const registerUser = async ({ name, email, mobile, password }) => {
     }
 
     const otp = generateOTP();
+    logger.info("otp",otp);
     const user = new User({
         name,
         email,
