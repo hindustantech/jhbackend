@@ -15,7 +15,7 @@ import bodyParser from "body-parser";   // <-- Add this
 import serviceRoutes from './routes/serviceRoutes.js';
 import packageRoutes from './routes/packageRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
-
+import gallaryroute from './routes/galleryRoutes.js'
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,6 +47,7 @@ app.use("/api/auth", authRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/gallaryroute', gallaryroute);
 
 app.get("/", (req, res) => {
     res.send("jh Website is running");
