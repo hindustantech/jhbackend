@@ -10,6 +10,7 @@ import authRoutes from "./routes/authRoutes.js";
 import { connectDB } from "./config/db.js";
 import { errorHandler } from "./middleware/errorMiddleware.js";
 import { logger } from "./config/logger.js";
+import bodyParser from "body-parser";   // <-- Add this
 
 import serviceRoutes from './routes/serviceRoutes.js';
 import packageRoutes from './routes/packageRoutes.js';
