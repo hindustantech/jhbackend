@@ -19,6 +19,16 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+
+
+
+app.use(express.json({ limit: '50mb' })); // For JSON payloads
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); // For URL-encoded
+
+// If using body-parser directly
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+
 app.use(helmet());
 app.use(cors());
 app.use(morgan("combined", { stream: { write: (message) => logger.info(message.trim()) } }));
