@@ -59,4 +59,3 @@ export const sendBookingEmail = async (bookingData) => {
         return false;
     }
 };
-s
