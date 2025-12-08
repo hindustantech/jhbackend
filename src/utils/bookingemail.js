@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { appConfig } from "../config.js";
+import { config } from "../config/index.js";
 import { logger } from "../config/logger.js";
 
 export const sendBookingEmail = async (bookingData) => {
@@ -12,8 +12,8 @@ export const sendBookingEmail = async (bookingData) => {
             service: "gmail",
             secure: true,
             auth: {
-                user: appConfig.emailUser,
-                pass: appConfig.emailPass
+                user: config.emailUser,
+                pass: config.emailPass
             }
         });
 
@@ -21,8 +21,8 @@ export const sendBookingEmail = async (bookingData) => {
         // EMAIL TO SHOP OWNER
         // ============================
         const ownerMailOptions = {
-            from: `"Booking Alert" <${appConfig.emailUser}>`,
-            to: appConfig.shopOwner,
+            from: `"Booking Alert" <${config.emailUser}>`,
+            to: config.shopowner,
             subject: "📩 New Booking Received",
             html: `
                 <h2>New Booking Details</h2>
@@ -40,7 +40,7 @@ export const sendBookingEmail = async (bookingData) => {
         // EMAIL TO CUSTOMER
         // ============================
         const customerMailOptions = {
-            from: `"Your Shop" <${appConfig.emailUser}>`,
+            from: `"Your Shop" <${config.emailUser}>`,
             to: email,
             subject: "✅ Your Booking is Confirmed",
             html: `
