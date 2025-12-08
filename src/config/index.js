@@ -8,6 +8,7 @@ export const config = {
     jwtSecret: process.env.JWT_SECRET,
     emailUser: process.env.EMAIL_USER,
     emailPass: process.env.EMAIL_PASS,
+    shopowner:process.env.SHOP_OWNER_EMAIL,
     port: process.env.PORT || 3000,
     nodeEnv: process.env.NODE_ENV || "development"
 };
