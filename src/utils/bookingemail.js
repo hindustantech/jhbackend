@@ -76,13 +76,38 @@ export const sendBookingEmail = async (bookingData) => {
                         <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                             
                             <!-- Header -->
-                            <tr>
-                                <td style="background: linear-gradient(135deg, #0066FF 0%, #0052CC 100%); padding: 40px 30px; text-align: center;">
-                                    <div style="width: 70px; height: 70px; background-color: rgba(255, 255, 255, 0.2); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 36px; line-height: 70px;">✓</div>
-                                    <h1 style="color: #ffffff; font-size: 28px; font-weight: 600; margin: 0 0 8px 0;">Booking Confirmed</h1>
-                                    <p style="color: #ffffff; font-size: 16px; margin: 0; opacity: 0.9;">We look forward to serving you</p>
-                                </td>
-                            </tr>
+                        <tr>
+  <td style="background: linear-gradient(135deg, #0066FF 0%, #0052CC 100%); padding: 40px 30px; text-align: center;">
+      
+      <!-- Center Safe Circle Icon -->
+      <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+        <tr>
+          <td style="
+            width: 70px;
+            height: 70px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            text-align: center;
+            font-size: 36px;
+            line-height: 70px;
+            color: #ffffff;
+          ">
+            ✓
+          </td>
+        </tr>
+      </table>
+
+      <h1 style="color: #ffffff; font-size: 28px; font-weight: 600; margin: 16px 0 8px 0;">
+        Booking Confirmed
+      </h1>
+
+      <p style="color: #ffffff; font-size: 16px; margin: 0; opacity: 0.9;">
+        We look forward to serving you
+      </p>
+
+  </td>
+</tr>
+
                             
                             <!-- Content -->
                             <tr>
