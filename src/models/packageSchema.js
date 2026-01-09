@@ -1,6 +1,27 @@
 // models/Package.js
 import mongoose from "mongoose";
 
+const serviceSchema = new mongoose.Schema(
+    {
+        serviceName: {
+            type: String,
+            required: true,
+            trim: true
+        },
+
+        price: {
+            type: Number,
+            required: false
+        },
+
+        duration: {
+            type: Number, // minutes (optional)
+            required: false
+        }
+    },
+    { _id: false } // prevents auto ObjectId for each service
+);
+
 const packageSchema = new mongoose.Schema(
     {
         packageName: {
@@ -15,7 +36,7 @@ const packageSchema = new mongoose.Schema(
         },
 
         packageDuration: {
-            type: Number, // total duration (mins)
+            type: Number, // total duration in minutes
             required: true
         },
 
@@ -35,16 +56,10 @@ const packageSchema = new mongoose.Schema(
             }
         },
 
-        servicesIncluded: [
-            {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "Service"
-            }
-        ],
+        servicesIncluded: [serviceSchema],
 
         category: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Category",
+            type: String, // simplified for flexibility
             required: true
         },
 
