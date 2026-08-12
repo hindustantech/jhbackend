@@ -18,7 +18,9 @@ const run = async () => {
                 $set: {
                     label: { $ifNull: ["$question", ""] },
                     answer: { $ifNull: ["$message", ""] },
-                    parentId: null
+                    parentId: null,
+                    positionX: 0,
+                    positionY: 0
                 }
             },
             { $unset: ["question", "message", "isQuickReply"] }

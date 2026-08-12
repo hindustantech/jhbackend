@@ -15,13 +15,25 @@ const normalizeParent = async (parentId) => {
     return parentId;
 };
 
+// Walk up the ancestor chain of `startId` looking for `targetId`
+const isAncestor = async (startId, targetId) => {
+    let current = startId;
+    while (current) {
+        if (current === targetId) return true;
+        const node = await Chatbot.findById(current).select('parentId');
+        if (!node || !node.parentId) break;
+        current = node.parentId.toString();
+    }
+    return false;
+};
+
 /**
  * Create or Update chatbot node.
  * If req.body.id present -> update (only provided fields are changed), else create.
  */
 export const createOrUpdateItem = async (req, res) => {
     try {
-        const { id, label, answer, active, order, parentId } = req.body;
+        const { id, label, answer, active, order, parentId, positionX, positionY } = req.body;
 
         if (label !== undefined && !String(label).trim()) {
             return res.status(400).json({ ok: false, message: 'label is required.' });
@@ -32,7 +44,16 @@ export const createOrUpdateItem = async (req, res) => {
         if (answer !== undefined) payload.answer = answer;
         if (active !== undefined) payload.active = !!active;
         if (order !== undefined) payload.order = Number(order) || 0;
-        if (parentId !== undefined) payload.parentId = await normalizeParent(parentId);
+        if (positionX !== undefined) payload.positionX = Number(positionX) || 0;
+        if (positionY !== undefined) payload.positionY = Number(positionY) || 0;
+        if (parentId !== undefined) {
+            const normalized = await normalizeParent(parentId);
+            // Cycle guard: prevent linking a node under its own descendant
+            if (id && normalized && await isAncestor(normalized, id)) {
+                return res.status(400).json({ ok: false, message: 'Cannot link a question under its own sub-question (cycle detected).' });
+            }
+            payload.parentId = normalized;
+        }
 
         if (Object.keys(payload).length === 0) {
             return res.status(400).json({ ok: false, message: 'No fields to save.' });
@@ -54,7 +75,9 @@ export const createOrUpdateItem = async (req, res) => {
             answer: payload.answer ?? '',
             active: payload.active ?? true,
             order: payload.order ?? 0,
-            parentId: payload.parentId ?? null
+            parentId: payload.parentId ?? null,
+            positionX: payload.positionX ?? 0,
+            positionY: payload.positionY ?? 0
         });
         await item.save();
         return res.status(201).json({ ok: true, message: 'Chatbot item created', data: item });

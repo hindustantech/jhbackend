@@ -27,6 +27,15 @@ const chatbotSchema = new mongoose.Schema(
         order: {
             type: Number,
             default: 0
+        },
+        // Canvas flow builder position
+        positionX: {
+            type: Number,
+            default: 0
+        },
+        positionY: {
+            type: Number,
+            default: 0
         }
     },
     { timestamps: true }
