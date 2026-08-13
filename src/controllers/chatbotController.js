@@ -15,14 +15,35 @@ const normalizeParent = async (parentId) => {
     return parentId;
 };
 
-// Walk up the ancestor chain of `startId` looking for `targetId`
-const isAncestor = async (startId, targetId) => {
-    let current = startId;
-    while (current) {
-        if (current === targetId) return true;
-        const node = await Chatbot.findById(current).select('parentId');
-        if (!node || !node.parentId) break;
-        current = node.parentId.toString();
+const normalizeParents = async (parentIds) => {
+    if (!Array.isArray(parentIds)) return [];
+    const unique = [...new Set(parentIds)];
+    const normalized = [];
+    for (const pid of unique) {
+        const n = await normalizeParent(pid);
+        if (n) normalized.push(n);
+    }
+    return normalized;
+};
+
+// Graph-safe cycle check: starting from `startId`, walk BOTH directions
+// (children and parents). If we ever reach `targetId`, a cycle would be created.
+const canReach = async (startId, targetId, seen = new Set()) => {
+    if (seen.has(startId)) return false;
+    seen.add(startId);
+    if (startId === targetId) return true;
+
+    const node = await Chatbot.findById(startId).select('parentId parentIds');
+    if (!node) return false;
+
+    const frontier = [];
+    for (const pid of node.parentIds || []) frontier.push(pid.toString());
+    if (node.parentId && !(node.parentIds || []).some((p) => p && p.toString() === node.parentId.toString())) {
+        frontier.push(node.parentId.toString());
+    }
+
+    for (const next of frontier) {
+        if (await canReach(next, targetId, seen)) return true;
     }
     return false;
 };
@@ -30,10 +51,11 @@ const isAncestor = async (startId, targetId) => {
 /**
  * Create or Update chatbot node.
  * If req.body.id present -> update (only provided fields are changed), else create.
+ * Supports a single legacy `parentId` and/or a `parentIds` array (graph links).
  */
 export const createOrUpdateItem = async (req, res) => {
     try {
-        const { id, label, answer, active, order, parentId, positionX, positionY } = req.body;
+        const { id, label, answer, active, order, parentId, parentIds, positionX, positionY } = req.body;
 
         if (label !== undefined && !String(label).trim()) {
             return res.status(400).json({ ok: false, message: 'label is required.' });
@@ -46,13 +68,39 @@ export const createOrUpdateItem = async (req, res) => {
         if (order !== undefined) payload.order = Number(order) || 0;
         if (positionX !== undefined) payload.positionX = Number(positionX) || 0;
         if (positionY !== undefined) payload.positionY = Number(positionY) || 0;
-        if (parentId !== undefined) {
-            const normalized = await normalizeParent(parentId);
-            // Cycle guard: prevent linking a node under its own descendant
-            if (id && normalized && await isAncestor(normalized, id)) {
-                return res.status(400).json({ ok: false, message: 'Cannot link a question under its own sub-question (cycle detected).' });
+
+        if (parentIds !== undefined || parentId !== undefined) {
+            let normalized;
+            if (parentIds !== undefined) {
+                normalized = await normalizeParents(parentIds);
+            } else {
+                // Legacy single-parent update — replace the whole link set with
+                // the previous parents + the new single parent (add/remove).
+                const existing = id ? await Chatbot.findById(id).select('parentIds') : null;
+                const prev = (existing?.parentIds || []).map((p) => p.toString());
+                const single = await normalizeParent(parentId);
+                if (single) {
+                    normalized = [...prev.filter((p) => p !== single), single];
+                } else {
+                    normalized = [];
+                }
             }
-            payload.parentId = normalized;
+
+            // Cycle guard: reject links that would let the new parents reach this node
+            // through children (parent is a descendant) or through parents (graph cycle).
+            if (id && normalized.length > 0) {
+                for (const nid of normalized) {
+                    if (nid === id) {
+                        return res.status(400).json({ ok: false, message: 'Cannot link a question to itself.' });
+                    }
+                    if (await canReach(nid, id)) {
+                        return res.status(400).json({ ok: false, message: 'Cannot link a question under its own sub-question (cycle detected).' });
+                    }
+                }
+            }
+
+            payload.parentIds = normalized;
+            payload.parentId = normalized.length > 0 ? normalized[0] : null;
         }
 
         if (Object.keys(payload).length === 0) {
@@ -75,7 +123,8 @@ export const createOrUpdateItem = async (req, res) => {
             answer: payload.answer ?? '',
             active: payload.active ?? true,
             order: payload.order ?? 0,
-            parentId: payload.parentId ?? null,
+            parentIds: payload.parentIds ?? [],
+            parentId: (payload.parentIds ?? [])[0] ?? null,
             positionX: payload.positionX ?? 0,
             positionY: payload.positionY ?? 0
         });
@@ -117,7 +166,14 @@ export const getChatbotItems = async (req, res) => {
 // Public - level 1 options shown in the client chat
 export const getRoots = async (req, res) => {
     try {
-        const items = await Chatbot.find({ active: true, parentId: null }).sort('order');
+        const items = await Chatbot.find({
+            active: true,
+            $or: [
+                { parentIds: { $size: 0 } },
+                { parentIds: { $exists: false } },
+                { parentId: null }
+            ]
+        }).sort('order');
         return res.json({ ok: true, data: items });
     } catch (err) {
         console.error('getRoots error', err);
@@ -125,11 +181,15 @@ export const getRoots = async (req, res) => {
     }
 };
 
-// Public - next level options for a selected node
+// Public - next level options for a selected node (a node can live under
+// many parents, so we match against parentIds and the legacy parentId).
 export const getChildren = async (req, res) => {
     try {
         const { parentId } = req.params;
-        const items = await Chatbot.find({ active: true, parentId }).sort('order');
+        const items = await Chatbot.find({
+            active: true,
+            $or: [{ parentIds: parentId }, { parentId }]
+        }).sort('order');
         return res.json({ ok: true, data: items });
     } catch (err) {
         console.error('getChildren error', err);
@@ -137,18 +197,30 @@ export const getChildren = async (req, res) => {
     }
 };
 
-// Collect all descendant ids (recursively) for cascade delete
+// Collect every descendant id (BFS over the graph's parentIds links).
+// Only cascades into children that have no remaining parents outside the
+// deleted set, so multi-parent nodes survive the deletion of one parent.
 const collectDescendantIds = async (ids) => {
-    let all = [...ids];
+    const doomed = new Set(ids);
     let frontier = ids;
     while (frontier.length > 0) {
-        const children = await Chatbot.find({ parentId: { $in: frontier } }).select('_id');
-        const childIds = children.map((c) => c._id.toString());
-        if (childIds.length === 0) break;
-        all = all.concat(childIds);
-        frontier = childIds;
+        const children = await Chatbot.find({ parentIds: { $in: frontier } }).select('parentIds');
+        const next = [];
+        for (const child of children) {
+            const childId = child._id.toString();
+            if (doomed.has(childId)) continue;
+            const remainingParents = (child.parentIds || [])
+                .map((p) => p.toString())
+                .filter((p) => !doomed.has(p));
+            // Only cascade when this node has no parents left outside the deleted set
+            if (remainingParents.length === 0) {
+                doomed.add(childId);
+                next.push(childId);
+            }
+        }
+        frontier = next;
     }
-    return all;
+    return [...doomed];
 };
 
 export const deleteChatbotItem = async (req, res) => {

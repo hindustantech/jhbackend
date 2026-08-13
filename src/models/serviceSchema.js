@@ -43,6 +43,30 @@ const serviceSchema = new mongoose.Schema(
             required: true
         },
 
+        imageUrl: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        cloudinaryPublicId: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        discount: {
+            type: Number,
+            default: 0,
+            min: 0,
+            max: 100
+        },
+
+        isActive: {
+            type: Boolean,
+            default: true
+        },
+
         subServices: [subServiceSchema]
     },
     { timestamps: true }

@@ -6,12 +6,13 @@ import {
     getServiceById,
     deleteService
 } from '../controllers/serviceController.js';
+import { uploadSingleImage, handleUploadError } from '../middleware/upload.js';
 
 
 const router = express.Router();
 
 // Create or Update (POST) - if req.body.id present update else create
-router.post('/', createOrUpdateService);
+router.post('/', uploadSingleImage, handleUploadError, createOrUpdateService);
 
 // Get list with pagination & search
 router.get('/', getServices);
