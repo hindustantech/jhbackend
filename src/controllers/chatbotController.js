@@ -2,6 +2,8 @@
 import mongoose from "mongoose";
 import Chatbot from '../models/chatbotSchema.js';
 import { parsePagination, buildSearchQuery } from '../utils/apiHelpers.js';
+import { uploadToCloudinary } from '../middleware/upload.js';
+import cloudinary from '../config/cloudinary.js';
 
 const normalizeParent = async (parentId) => {
     if (parentId === null || parentId === undefined || parentId === '') return null;
@@ -55,7 +57,7 @@ const canReach = async (startId, targetId, seen = new Set()) => {
  */
 export const createOrUpdateItem = async (req, res) => {
     try {
-        const { id, label, answer, active, order, parentId, parentIds, positionX, positionY } = req.body;
+        const { id, label, answer, active, order, parentId, parentIds, positionX, positionY, imageUrl, cloudinaryPublicId } = req.body;
 
         if (label !== undefined && !String(label).trim()) {
             return res.status(400).json({ ok: false, message: 'label is required.' });
@@ -64,6 +66,8 @@ export const createOrUpdateItem = async (req, res) => {
         const payload = {};
         if (label !== undefined) payload.label = String(label).trim();
         if (answer !== undefined) payload.answer = answer;
+        if (imageUrl !== undefined) payload.imageUrl = String(imageUrl).trim();
+        if (cloudinaryPublicId !== undefined) payload.cloudinaryPublicId = String(cloudinaryPublicId).trim();
         if (active !== undefined) payload.active = !!active;
         if (order !== undefined) payload.order = Number(order) || 0;
         if (positionX !== undefined) payload.positionX = Number(positionX) || 0;
@@ -121,6 +125,8 @@ export const createOrUpdateItem = async (req, res) => {
         item = new Chatbot({
             label: payload.label,
             answer: payload.answer ?? '',
+            imageUrl: payload.imageUrl ?? '',
+            cloudinaryPublicId: payload.cloudinaryPublicId ?? '',
             active: payload.active ?? true,
             order: payload.order ?? 0,
             parentIds: payload.parentIds ?? [],
@@ -133,6 +139,53 @@ export const createOrUpdateItem = async (req, res) => {
     } catch (err) {
         console.error('createOrUpdateItem error', err);
         return res.status(err.statusCode || 500).json({ ok: false, message: err.statusCode ? err.message : 'Server error', error: err.statusCode ? undefined : err.message });
+    }
+};
+
+// Upload an image for a chatbot node and return its Cloudinary URL
+export const uploadChatbotImage = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ ok: false, message: 'Please upload an image file' });
+        }
+
+        try {
+            const cloudinaryResult = await uploadToCloudinary(req.file.buffer, req.file.originalname);
+            return res.status(201).json({
+                ok: true,
+                message: 'Image uploaded successfully',
+                data: {
+                    url: cloudinaryResult.secure_url,
+                    publicId: cloudinaryResult.public_id
+                }
+            });
+        } catch (uploadError) {
+            console.error('uploadChatbotImage cloudinary error', uploadError);
+            return res.status(500).json({ ok: false, message: 'Failed to upload image to Cloudinary', error: uploadError.message });
+        }
+    } catch (err) {
+        console.error('uploadChatbotImage error', err);
+        return res.status(500).json({ ok: false, message: 'Server error', error: err.message });
+    }
+};
+
+// Delete an uploaded image from Cloudinary (used when replacing/removing a node image)
+export const deleteChatbotImage = async (req, res) => {
+    try {
+        const { publicId } = req.body;
+        if (!publicId) {
+            return res.status(400).json({ ok: false, message: 'publicId is required' });
+        }
+        try {
+            await cloudinary.uploader.destroy(publicId);
+        } catch (cloudinaryError) {
+            console.error('deleteChatbotImage cloudinary error', cloudinaryError);
+            return res.status(500).json({ ok: false, message: 'Failed to delete image from Cloudinary', error: cloudinaryError.message });
+        }
+        return res.json({ ok: true, message: 'Image deleted' });
+    } catch (err) {
+        console.error('deleteChatbotImage error', err);
+        return res.status(500).json({ ok: false, message: 'Server error', error: err.message });
     }
 };
 
@@ -164,8 +217,7 @@ export const getChatbotItems = async (req, res) => {
 };
 
 // Public - level 1 options shown in the client chat
-export const getRoots = async (req, res) => {
-    try {
+export const getRoots = async (req, res) => {    try {
         const items = await Chatbot.find({
             active: true,
             $or: [
@@ -230,6 +282,17 @@ export const deleteChatbotItem = async (req, res) => {
         if (!item) return res.status(404).json({ ok: false, message: 'Chatbot item not found' });
 
         const ids = await collectDescendantIds([id]);
+        const doomed = await Chatbot.find({ _id: { $in: ids } }).select('cloudinaryPublicId');
+        for (const node of doomed) {
+            if (node.cloudinaryPublicId) {
+                try {
+                    await cloudinary.uploader.destroy(node.cloudinaryPublicId);
+                } catch (cloudinaryError) {
+                    console.error('Chatbot image delete error:', cloudinaryError);
+                }
+            }
+        }
+
         await Chatbot.deleteMany({ _id: { $in: ids } });
 
         return res.json({ ok: true, message: `Chatbot item and ${ids.length - 1} sub-question(s) deleted` });

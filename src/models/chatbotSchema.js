@@ -14,6 +14,16 @@ const chatbotSchema = new mongoose.Schema(
             type: String,
             default: ""
         },
+        // Optional image shown with the answer in the client chat
+        imageUrl: {
+            type: String,
+            default: ""
+        },
+        // Cloudinary public id — kept for cleanup when the image is replaced or the node deleted
+        cloudinaryPublicId: {
+            type: String,
+            default: ""
+        },
         // Legacy single parent — kept as an alias of parentIds[0] for backward
         // compatibility with old clients and existing data.
         parentId: {
