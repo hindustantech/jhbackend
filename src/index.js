@@ -69,7 +69,7 @@ const startServer = async () => {
     try {
         await connectDB();
         app.listen(PORT, () => {
-            logger.info(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+            logger.info(`Server is running on port ${PORT} in ${process.env.NODE_ENV} mode Rupwe`);
         });
     } catch (error) {
         logger.error("Failed to start server:", error);
