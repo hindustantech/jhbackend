@@ -19,6 +19,8 @@ import gallaryroute from './routes/galleryRoutes.js'
 import bookingroute from './routes/bookingRoutes.js'
 import chatbotRoutes from './routes/chatbotRoutes.js'
 import offerRoutes from './routes/offerRoutes.js'
+import reviewRoutes from './routes/reviewRoutes.js'
+import billRoutes from './routes/bulkImportRoutes.js'
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -54,6 +56,8 @@ app.use('/api/gallaryroute', gallaryroute);
 app.use('/api/bookingroute', bookingroute);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/offers', offerRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/bills', billRoutes);
 
 app.get("/", (req, res) => {
     res.send("jh Website is running");

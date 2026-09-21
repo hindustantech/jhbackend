@@ -10,5 +10,8 @@ export const config = {
     emailPass: process.env.EMAIL_PASS,
     shopowner:process.env.SHOP_OWNER_EMAIL,
     port: process.env.PORT || 3000,
-    nodeEnv: process.env.NODE_ENV || "development"
+    nodeEnv: process.env.NODE_ENV || "development",
+    whatsappApiKey: process.env.WHATSAPP_API_KEY,
+    whatsappApiUrl: process.env.WHATSAPP_API_URL,
+    whatsappTemplateName: process.env.WHATSAPP_TEMPLATE_NAME
 };
