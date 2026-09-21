@@ -60,7 +60,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/bills', billRoutes);
 
 app.get("/", (req, res) => {
-    res.send("jh Website is running");
+    res.send("jh Website is running..........................");
 });
 
 app.use(errorHandler);
