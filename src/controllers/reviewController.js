@@ -14,12 +14,13 @@ export const createReview = async (req, res, next) => {
             return res.status(400).json({ ok: false, message: "Rating must be between 1 and 5" });
         }
 
-        const phoneRegex = /^\+?91?[6-9]\d{9}$/;
+        const phoneRegex = /^\+?(91)?[6-9]\d{9}$/;
         if (!phoneRegex.test(phone.replace(/\s/g, ""))) {
             return res.status(400).json({ ok: false, message: "Please provide a valid Indian phone number" });
         }
 
-        const normalizedPhone = phone.replace(/\s/g, "");
+        const cleanPhone = phone.replace(/\s/g, "");
+        const normalizedPhone = cleanPhone.startsWith("+91") ? cleanPhone : cleanPhone.startsWith("91") ? `+${cleanPhone}` : `+91${cleanPhone}`;
 
         const review = await Review.create({
             rating: parseInt(rating),
