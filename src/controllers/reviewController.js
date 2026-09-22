@@ -1,37 +1,101 @@
 import Review from "../models/reviewSchema.js";
+import Emp from "../models/empSchema.js";
 import { sendWhatsAppTemplate } from "../services/whatsappService.js";
 import { logger } from "../config/logger.js";
 
+const normalizePhone = (phone) => {
+    const clean = phone.replace(/\s/g, "");
+    if (clean.startsWith("+91")) return clean;
+    if (clean.startsWith("91")) return `+${clean}`;
+    return `+91${clean}`;
+};
+
+const isValidRating = (val) => {
+    const n = Number(val);
+    return Number.isInteger(n) && n >= 1 && n <= 5;
+};
+
 export const createReview = async (req, res, next) => {
     try {
-        const { rating, reviewText, phone } = req.body;
+        const {
+            rating, reviewText, phone,
+            empName, dob, anniversaryDate,
+            categories, employeeCategories,
+            specialData
+        } = req.body;
 
         if (!rating || !phone) {
             return res.status(400).json({ ok: false, message: "Rating and phone are required" });
         }
 
-        if (rating < 1 || rating > 5) {
+        if (!isValidRating(rating)) {
             return res.status(400).json({ ok: false, message: "Rating must be between 1 and 5" });
         }
 
         const phoneRegex = /^\+?(91)?[6-9]\d{9}$/;
-        if (!phoneRegex.test(phone.replace(/\s/g, ""))) {
+        const cleanPhone = phone.replace(/\s/g, "");
+        if (!phoneRegex.test(cleanPhone)) {
             return res.status(400).json({ ok: false, message: "Please provide a valid Indian phone number" });
         }
 
-        const cleanPhone = phone.replace(/\s/g, "");
-        const normalizedPhone = cleanPhone.startsWith("+91") ? cleanPhone : cleanPhone.startsWith("91") ? `+${cleanPhone}` : `+91${cleanPhone}`;
+        const normalizedPhone = cleanPhone.startsWith("+91") ? cleanPhone
+            : cleanPhone.startsWith("91") ? `+${cleanPhone}`
+            : `+91${cleanPhone}`;
+
+        if (dob && isNaN(Date.parse(dob))) {
+            return res.status(400).json({ ok: false, message: "Invalid date of birth" });
+        }
+        if (anniversaryDate && isNaN(Date.parse(anniversaryDate))) {
+            return res.status(400).json({ ok: false, message: "Invalid anniversary date" });
+        }
+
+        let empId = null;
+        if (empName) {
+            const emp = await Emp.findOne({ name: { $regex: new RegExp(`^${empName}$`, "i") } });
+            if (emp) {
+                empId = emp._id;
+            }
+        }
+
+        const validatedCategories = {};
+        if (categories) {
+            for (const [key, val] of Object.entries(categories)) {
+                if (val !== null && val !== undefined) {
+                    if (!isValidRating(val)) {
+                        return res.status(400).json({ ok: false, message: `Category "${key}" must be between 1 and 5` });
+                    }
+                    validatedCategories[key] = Number(val);
+                }
+            }
+        }
+
+        const validatedEmpCategories = {};
+        if (employeeCategories) {
+            for (const [key, val] of Object.entries(employeeCategories)) {
+                if (val !== null && val !== undefined) {
+                    if (!isValidRating(val)) {
+                        return res.status(400).json({ ok: false, message: `Employee category "${key}" must be between 1 and 5` });
+                    }
+                    validatedEmpCategories[key] = Number(val);
+                }
+            }
+        }
 
         const review = await Review.create({
             rating: parseInt(rating),
             reviewText: reviewText || "",
             phone: normalizedPhone,
+            empId,
+            empName: empName || "",
+            dob: dob || null,
+            anniversaryDate: anniversaryDate || null,
+            categories: validatedCategories,
+            employeeCategories: validatedEmpCategories,
+            specialData: specialData || {},
             ipAddress: req.ip || req.connection?.remoteAddress || "",
             userAgent: req.headers["user-agent"] || ""
         });
 
-        // Fire-and-forge: Send WhatsApp template after review submission (don't block response)
-        // This will send the offer template to the user's phone
         sendWhatsAppTemplate(normalizedPhone, "Valued Customer", "15")
             .then((result) => {
                 if (result.ok) {
@@ -52,7 +116,104 @@ export const createReview = async (req, res, next) => {
                 rating: review.rating,
                 reviewText: review.reviewText,
                 phone: review.phone,
+                empName: review.empName,
+                categories: review.categories,
+                employeeCategories: review.employeeCategories,
+                dob: review.dob,
+                anniversaryDate: review.anniversaryDate,
+                specialData: review.specialData,
                 createdAt: review.createdAt
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getCustomerReviews = async (req, res, next) => {
+    try {
+        const { phone } = req.params;
+        if (!phone) {
+            return res.status(400).json({ ok: false, message: "Phone number is required" });
+        }
+
+        const normalizedPhone = normalizePhone(phone);
+
+        const reviews = await Review.find({ phone: normalizedPhone, active: true })
+            .sort({ createdAt: -1 })
+            .populate("empId", "name phone role specialization");
+
+        if (!reviews.length) {
+            return res.status(404).json({ ok: false, message: "No reviews found for this phone number" });
+        }
+
+        const totalReviews = reviews.length;
+        const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews;
+
+        res.json({
+            ok: true,
+            data: {
+                phone: normalizedPhone,
+                totalReviews,
+                avgRating: Math.round(avgRating * 10) / 10,
+                reviews
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getEmployeeReviews = async (req, res, next) => {
+    try {
+        const { empId } = req.params;
+        if (!empId) {
+            return res.status(400).json({ ok: false, message: "Employee ID is required" });
+        }
+
+        const emp = await Emp.findById(empId);
+        if (!emp) {
+            return res.status(404).json({ ok: false, message: "Employee not found" });
+        }
+
+        const reviews = await Review.find({ empId, active: true })
+            .sort({ createdAt: -1 })
+            .select("-userAgent -ipAddress");
+
+        if (!reviews.length) {
+            return res.status(404).json({ ok: false, message: "No reviews found for this employee" });
+        }
+
+        const totalReviews = reviews.length;
+        const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews;
+
+        const empCatTotals = { professionalism: 0, behavior: 0, skillExpertise: 0, communication: 0 };
+        let empCatCount = 0;
+
+        reviews.forEach((r) => {
+            if (r.employeeCategories) {
+                for (const key of Object.keys(empCatTotals)) {
+                    if (r.employeeCategories[key]) {
+                        empCatTotals[key] += r.employeeCategories[key];
+                    }
+                }
+                empCatCount++;
+            }
+        });
+
+        const empCatAvg = {};
+        for (const [key, val] of Object.entries(empCatTotals)) {
+            empCatAvg[key] = empCatCount > 0 ? Math.round((val / empCatCount) * 10) / 10 : 0;
+        }
+
+        res.json({
+            ok: true,
+            data: {
+                employee: { _id: emp._id, name: emp.name, phone: emp.phone, role: emp.role },
+                totalReviews,
+                avgRating: Math.round(avgRating * 10) / 10,
+                employeeCategoryAverages: empCatAvg,
+                reviews
             }
         });
     } catch (error) {
@@ -82,6 +243,7 @@ export const getAllReviews = async (req, res, next) => {
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit)
+                .populate("empId", "name phone role")
                 .select("-userAgent -ipAddress"),
             Review.countDocuments(filter)
         ]);
