@@ -15,12 +15,15 @@ const isValidRating = (val) => {
     return Number.isInteger(n) && n >= 1 && n <= 5;
 };
 
+
+
 export const createReview = async (req, res, next) => {
     try {
         const {
             rating, reviewText, phone,
             empName, dob, anniversaryDate,
             categories, employeeCategories,
+            employees: employeesBody,
             specialData
         } = req.body;
 
@@ -81,12 +84,32 @@ export const createReview = async (req, res, next) => {
             }
         }
 
+        const validatedEmployees = [];
+        if (Array.isArray(employeesBody) && employeesBody.length > 0) {
+            for (const empEntry of employeesBody) {
+                const empNameStr = empEntry.empName || "";
+                let empIdVal = null;
+                if (empNameStr) {
+                    const emp = await Emp.findOne({ name: { $regex: new RegExp(`^${empNameStr}$`, "i") } });
+                    if (emp) {
+                        empIdVal = emp._id;
+                    }
+                }
+
+                validatedEmployees.push({
+                    empId: empIdVal,
+                    empName: empNameStr
+                });
+            }
+        }
+
         const review = await Review.create({
             rating: parseInt(rating),
             reviewText: reviewText || "",
             phone: normalizedPhone,
-            empId,
-            empName: empName || "",
+            empId: empId || (validatedEmployees.length === 1 ? validatedEmployees[0].empId : null),
+            empName: empName || (validatedEmployees.length === 1 ? validatedEmployees[0].empName : ""),
+            employees: validatedEmployees.length > 0 ? validatedEmployees : undefined,
             dob: dob || null,
             anniversaryDate: anniversaryDate || null,
             categories: validatedCategories,
@@ -117,6 +140,8 @@ export const createReview = async (req, res, next) => {
                 reviewText: review.reviewText,
                 phone: review.phone,
                 empName: review.empName,
+                empId: review.empId,
+                employees: review.employees,
                 categories: review.categories,
                 employeeCategories: review.employeeCategories,
                 dob: review.dob,
@@ -141,7 +166,8 @@ export const getCustomerReviews = async (req, res, next) => {
 
         const reviews = await Review.find({ phone: normalizedPhone, active: true })
             .sort({ createdAt: -1 })
-            .populate("empId", "name phone role specialization");
+            .populate("empId", "name phone role specialization")
+            .populate("employees.empId", "name phone role specialization");
 
         if (!reviews.length) {
             return res.status(404).json({ ok: false, message: "No reviews found for this phone number" });
@@ -176,9 +202,15 @@ export const getEmployeeReviews = async (req, res, next) => {
             return res.status(404).json({ ok: false, message: "Employee not found" });
         }
 
-        const reviews = await Review.find({ empId, active: true })
+        const reviews = await Review.find({
+            $or: [
+                { empId, active: true },
+                { "employees.empId": empId, active: true }
+            ]
+        })
             .sort({ createdAt: -1 })
-            .select("-userAgent -ipAddress");
+            .select("-userAgent -ipAddress")
+            .populate("employees.empId", "name phone role specialization");
 
         if (!reviews.length) {
             return res.status(404).json({ ok: false, message: "No reviews found for this employee" });
@@ -191,10 +223,11 @@ export const getEmployeeReviews = async (req, res, next) => {
         let empCatCount = 0;
 
         reviews.forEach((r) => {
-            if (r.employeeCategories) {
+            const cats = r.employeeCategories;
+            if (cats) {
                 for (const key of Object.keys(empCatTotals)) {
-                    if (r.employeeCategories[key]) {
-                        empCatTotals[key] += r.employeeCategories[key];
+                    if (cats[key]) {
+                        empCatTotals[key] += cats[key];
                     }
                 }
                 empCatCount++;
@@ -244,6 +277,7 @@ export const getAllReviews = async (req, res, next) => {
                 .skip(skip)
                 .limit(limit)
                 .populate("empId", "name phone role")
+                .populate("employees.empId", "name phone role")
                 .select("-userAgent -ipAddress"),
             Review.countDocuments(filter)
         ]);

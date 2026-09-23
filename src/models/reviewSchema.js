@@ -30,6 +30,19 @@ const reviewSchema = new mongoose.Schema(
             trim: true,
             default: ""
         },
+        employees: [
+            {
+                empId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "Emp"
+                },
+                empName: {
+                    type: String,
+                    trim: true,
+                    default: ""
+                }
+            }
+        ],
         dob: {
             type: Date,
             default: null
