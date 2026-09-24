@@ -131,6 +131,9 @@ export const updateBillStatus = async (req, res, next) => {
 export const exportAllRanking = async (req, res, next) => {
     try {
         const { type } = req.params;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
 
         const twelveMonthsAgo = new Date();
         twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
@@ -160,6 +163,8 @@ export const exportAllRanking = async (req, res, next) => {
                 }
             },
             { $sort: { [sortField]: -1 } },
+            { $skip: skip },
+            { $limit: limit },
             {
                 $project: {
                     _id: 0,
