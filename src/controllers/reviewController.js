@@ -305,12 +305,30 @@ export const getActiveReviews = async (req, res, next) => {
         const reviews = await Review.find({ active: true })
             .sort({ createdAt: -1 })
             .select("-userAgent -ipAddress")
+            .populate("empId", "name role specialization")
+            .populate("employees.empId", "name role specialization")
             .limit(20);
 
         res.json({
             ok: true,
             data: reviews
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getReviewById = async (req, res, next) => {
+    try {
+        const review = await Review.findById(req.params.id)
+            .populate("empId", "name phone role specialization")
+            .populate("employees.empId", "name phone role specialization");
+
+        if (!review) {
+            return res.status(404).json({ ok: false, message: "Review not found" });
+        }
+
+        res.json({ ok: true, data: review });
     } catch (error) {
         next(error);
     }

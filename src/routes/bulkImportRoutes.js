@@ -1,5 +1,5 @@
 import express from "express";
-import { importBills, getAllBills, getImportStats, deleteBill, updateBillStatus, getCustomerInsights } from "../controllers/bulkImportController.js";
+import { importBills, getAllBills, getImportStats, deleteBill, updateBillStatus, getCustomerInsights, getCustomerRanking } from "../controllers/bulkImportController.js";
 
 const router = express.Router();
 
@@ -9,5 +9,6 @@ router.get("/stats", getImportStats);
 router.delete("/:id", deleteBill);
 router.patch("/:id/status", updateBillStatus);
 router.get("/customer/:phone", getCustomerInsights);
+router.get("/ranking/:type", getCustomerRanking);
 
 export default router;

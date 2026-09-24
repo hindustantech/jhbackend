@@ -128,6 +128,86 @@ export const updateBillStatus = async (req, res, next) => {
     }
 };
 
+export const getCustomerRanking = async (req, res, next) => {
+    try {
+        const { type } = req.params;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+        const matchStage = { billDate: { $gte: twelveMonthsAgo } };
+
+        let sortField = "visitCount";
+        if (type === "avg-spent") sortField = "avgSpent";
+        else if (type === "total-spent") sortField = "totalSpent";
+        else if (type !== "visits") {
+            return res.status(400).json({ ok: false, message: "Invalid type. Use: visits, avg-spent, total-spent" });
+        }
+
+        const aggregationPipeline = [
+            { $match: matchStage },
+            {
+                $group: {
+                    _id: "$phoneNo",
+                    customerName: { $first: "$customerName" },
+                    phoneNo: { $first: "$phoneNo" },
+                    visitCount: { $sum: 1 },
+                    totalSpent: { $sum: "$amount" },
+                    avgSpent: { $avg: "$amount" },
+                    lastVisit: { $max: "$billDate" },
+                    firstVisit: { $min: "$billDate" },
+                    services: { $push: "$serviceName" }
+                }
+            },
+            { $sort: { [sortField]: -1 } },
+            {
+                $facet: {
+                    data: [
+                        { $skip: skip },
+                        { $limit: limit },
+                        {
+                            $project: {
+                                _id: 0,
+                                phoneNo: 1,
+                                customerName: 1,
+                                visitCount: 1,
+                                totalSpent: { $round: ["$totalSpent", 2] },
+                                avgSpent: { $round: ["$avgSpent", 2] },
+                                lastVisit: 1,
+                                firstVisit: 1,
+                                uniqueServices: { $size: { $setUnion: "$services" } }
+                            }
+                        }
+                    ],
+                    totalCount: [
+                        { $count: "count" }
+                    ]
+                }
+            }
+        ];
+
+        const [result] = await Bill.aggregate(aggregationPipeline);
+        const data = result.data || [];
+        const total = result.totalCount[0]?.count || 0;
+
+        res.json({
+            ok: true,
+            data,
+            pagination: {
+                page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const getCustomerInsights = async (req, res, next) => {
     try {
         const { phone } = req.params;
