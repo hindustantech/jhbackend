@@ -128,6 +128,65 @@ export const updateBillStatus = async (req, res, next) => {
     }
 };
 
+export const exportAllRanking = async (req, res, next) => {
+    try {
+        const { type } = req.params;
+
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+        const matchStage = { billDate: { $gte: twelveMonthsAgo } };
+
+        let sortField = "visitCount";
+        if (type === "avg-spent") sortField = "avgSpent";
+        else if (type === "total-spent") sortField = "totalSpent";
+        else if (type !== "visits") {
+            return res.status(400).json({ ok: false, message: "Invalid type. Use: visits, avg-spent, total-spent" });
+        }
+
+        const pipeline = [
+            { $match: matchStage },
+            {
+                $group: {
+                    _id: "$phoneNo",
+                    customerName: { $first: "$customerName" },
+                    phoneNo: { $first: "$phoneNo" },
+                    visitCount: { $sum: 1 },
+                    totalSpent: { $sum: "$amount" },
+                    avgSpent: { $avg: "$amount" },
+                    lastVisit: { $max: "$billDate" },
+                    firstVisit: { $min: "$billDate" },
+                    services: { $push: "$serviceName" }
+                }
+            },
+            { $sort: { [sortField]: -1 } },
+            {
+                $project: {
+                    _id: 0,
+                    phoneNo: 1,
+                    customerName: 1,
+                    visitCount: 1,
+                    totalSpent: { $round: ["$totalSpent", 2] },
+                    avgSpent: { $round: ["$avgSpent", 2] },
+                    lastVisit: 1,
+                    firstVisit: 1,
+                    uniqueServices: { $size: { $setUnion: "$services" } }
+                }
+            }
+        ];
+
+        const data = await Bill.aggregate(pipeline);
+
+        res.json({
+            ok: true,
+            data,
+            total: data.length
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const getCustomerRanking = async (req, res, next) => {
     try {
         const { type } = req.params;
