@@ -6,7 +6,9 @@ import {
     deleteReview,
     sendWhatsApp,
     getCustomerReviews,
-    getEmployeeReviews
+    getEmployeeReviews,
+    getActiveReviews,
+    toggleReviewActive
 } from "../controllers/reviewController.js";
 
 const router = express.Router();
@@ -14,8 +16,10 @@ const router = express.Router();
 router.post("/", createReview);
 router.get("/", getAllReviews);
 router.get("/stats", getReviewStats);
+router.get("/active", getActiveReviews);
 router.get("/customer/:phone", getCustomerReviews);
 router.get("/employee/:empId", getEmployeeReviews);
+router.patch("/:id/active", toggleReviewActive);
 router.delete("/:id", deleteReview);
 router.post("/whatsapp/send", sendWhatsApp);
 

@@ -270,6 +270,9 @@ export const getAllReviews = async (req, res, next) => {
         if (req.query.endDate) {
             filter.createdAt = { ...filter.createdAt, $lte: new Date(req.query.endDate) };
         }
+        if (req.query.active !== undefined) {
+            filter.active = req.query.active === "true";
+        }
 
         const [reviews, total] = await Promise.all([
             Review.find(filter)
@@ -292,6 +295,36 @@ export const getAllReviews = async (req, res, next) => {
                 pages: Math.ceil(total / limit)
             }
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getActiveReviews = async (req, res, next) => {
+    try {
+        const reviews = await Review.find({ active: true })
+            .sort({ createdAt: -1 })
+            .select("-userAgent -ipAddress")
+            .limit(20);
+
+        res.json({
+            ok: true,
+            data: reviews
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const toggleReviewActive = async (req, res, next) => {
+    try {
+        const review = await Review.findById(req.params.id);
+        if (!review) {
+            return res.status(404).json({ ok: false, message: "Review not found" });
+        }
+        review.active = !review.active;
+        await review.save();
+        res.json({ ok: true, data: { active: review.active } });
     } catch (error) {
         next(error);
     }
