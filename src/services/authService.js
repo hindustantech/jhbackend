@@ -41,7 +41,18 @@ export const loginUser = async ({ email, password }) => {
     user.refreshToken = refreshToken;
     await user.save();
 
-    return { accessToken, refreshToken };
+    return {
+        accessToken,
+        refreshToken,
+        user: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            mobile: user.mobile,
+            role: user.role,
+            permissions: user.permissions
+        }
+    };
 };
 
 export const forgotPassword = async ({ email }) => {

@@ -7,7 +7,7 @@ import { logger } from "../config/logger.js";
 export const generateAccessToken = (user) => {
     try {
         return jwt.sign(
-            { id: user._id, email: user.email },
+            { id: user._id, email: user.email, role: user.role, permissions: user.permissions },
             config.jwtSecret,
   
         );

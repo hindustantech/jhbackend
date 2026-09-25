@@ -2,6 +2,25 @@
 import { registerUser, loginUser, forgotPassword, changePassword, logoutUser } from "../services/authService.js";
 import { logger } from "../config/logger.js";
 import User from "../models/User.js";
+
+export const getMe = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.user._id).select("-password -refreshToken -otp -otpExpires");
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        res.json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            mobile: user.mobile,
+            role: user.role,
+            permissions: user.permissions
+        });
+    } catch (error) {
+        next(error);
+    }
+};
 export const register = async (req, res, next) => {
     try {
         const result = await registerUser(req.body);

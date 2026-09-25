@@ -30,6 +30,28 @@ const userSchema = new mongoose.Schema({
         required: [true, "Password is required"],
         minlength: 8
     },
+    role: {
+        type: String,
+        enum: ["super_admin", "admin", "manager", "employee"],
+        default: "employee"
+    },
+    permissions: [{
+        type: String,
+        enum: [
+            "dashboard:view",
+            "categories:manage",
+            "packages:manage",
+            "services:manage",
+            "gallery:manage",
+            "offers:manage",
+            "chatbot:manage",
+            "reviews:manage",
+            "bills:manage",
+            "customers:manage",
+            "ranking:view",
+            "employees:manage"
+        ]
+    }],
     refreshToken: {
         type: String
     },
