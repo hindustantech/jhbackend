@@ -54,11 +54,13 @@ function validateRecord(record, index) {
     const amount = record.amount || record["Amount"] || record["Total"] || record.total || record.price || record["Price"] || "";
     const billDate = record.billDate || record["Bill Date"] || record["Date"] || record.date || record["Invoice Date"] || "";
     const status = record.status || record["Status"] || "pending";
+    const billId = record.billId || record["Bill ID"] || record["bill_id"] || record.BillId || "";
 
     if (!customerName) errors.push("Missing customerName");
     if (!phoneNo) errors.push("Missing phoneNo");
     if (!serviceName) errors.push("Missing serviceName");
     if (!amount || isNaN(parseFloat(amount))) errors.push("Invalid amount");
+    if (!billId) errors.push("Missing billId");
 
     return {
         errors,
@@ -68,7 +70,8 @@ function validateRecord(record, index) {
             serviceName: String(serviceName).trim(),
             amount: parseFloat(amount) || 0,
             billDate: parseDate(billDate),
-            status: ["pending", "paid", "overdue", "cancelled"].includes(status) ? status : "pending"
+            status: ["pending", "paid", "overdue", "cancelled"].includes(status) ? status : "pending",
+            billId: String(billId).trim()
         }
     };
 }
@@ -76,15 +79,40 @@ function validateRecord(record, index) {
 export async function processImport(records) {
     const validRecords = [];
     const rowErrors = [];
+    const skippedBillIds = [];
+    const allBillIds = records.map((record) => {
+        const { normalized } = validateRecord(record, records.indexOf(record));
+        return normalized.billId;
+    }).filter((id) => id);
+
+    const dbBillIds = new Set(
+        (await Bill.find({ billId: { $in: [...allBillIds] } })).map((bill) => bill.billId)
+    );
 
     records.forEach((record, index) => {
         const { errors, normalized } = validateRecord(record, index);
-        if (errors.length === 0) {
-            const billId = `BILL-${Date.now()}-${String(index + 1).padStart(4, "0")}`;
-            validRecords.push({ billId, ...normalized });
-        } else {
+        if (errors.length > 0) {
             rowErrors.push({ row: index + 1, data: record, errors });
+            return;
         }
+
+        const { billId } = normalized;
+        const isDuplicateInFile = allBillIds.filter((id, i) => i !== index).includes(billId);
+        const isDuplicateInDb = dbBillIds.has(billId);
+
+        if (isDuplicateInFile) {
+            skippedBillIds.push(billId);
+            rowErrors.push({ row: index + 1, data: record, errors: ["Duplicate billId in file"] });
+            return;
+        }
+
+        if (isDuplicateInDb) {
+            skippedBillIds.push(billId);
+            rowErrors.push({ row: index + 1, data: record, errors: ["Duplicate billId in database"] });
+            return;
+        }
+
+        validRecords.push({ billId, ...normalized });
     });
 
     let inserted = [];
@@ -102,6 +130,8 @@ export async function processImport(records) {
         totalRecords: records.length,
         imported: inserted.length,
         failed: rowErrors.length,
+        skipped: skippedBillIds.length,
+        duplicates: [...new Set(skippedBillIds)],
         errors: rowErrors
     };
 }
