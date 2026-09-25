@@ -16,10 +16,10 @@ const router = express.Router();
 router.post('/', protect, authorize("services:manage"), uploadSingleImage, handleUploadError, createOrUpdateService);
 
 // Get list with pagination & search
-router.get('/', protect, authorize("dashboard:view", "services:manage"));
+router.get('/', protect, authorize("dashboard:view", "services:manage"), getServices);
 
 // Get one
-router.get('/:id', protect, authorize("dashboard:view", "services:manage"));
+router.get('/:id', protect, authorize("dashboard:view", "services:manage"), getServiceById);
 
 // Delete
 router.delete('/:id', protect, authorize("services:manage"));
