@@ -14,8 +14,8 @@ export const getMe = async (req, res, next) => {
             name: user.name,
             email: user.email,
             mobile: user.mobile,
-            role: user.role,
-            permissions: user.permissions
+            role: user.role || "employee",
+            permissions: user.permissions || []
         });
     } catch (error) {
         next(error);

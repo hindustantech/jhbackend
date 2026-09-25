@@ -3,12 +3,17 @@ import User from "../models/User.js";
 import { generateAccessToken, generateRefreshToken, generateOTP } from "../utils/authUtils.js";
 import { sendOTP } from "../utils/emailUtils.js";
 import { logger } from "../config/logger.js";
+import { config } from "../config/index.js";
 
 export const registerUser = async ({ name, email, mobile, password }) => {
     const existingUser = await User.findOne({ $or: [{ email }, { mobile }] });
     if (existingUser) {
         throw Object.assign(new Error("User already exists"), { statusCode: 400 });
     }
+
+    // Auto-assign super_admin role to the first user
+    const userCount = await User.countDocuments({});
+    const isFirstUser = userCount === 0;
 
     const otp = generateOTP();
     logger.info("otp",otp);
@@ -17,9 +22,25 @@ export const registerUser = async ({ name, email, mobile, password }) => {
         email,
         mobile,
         password,
-        otp,
-        otpExpires: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+        role: isFirstUser ? "super_admin" : "employee",
+        permissions: isFirstUser
+            ? [
+                  "dashboard:view",
+                  "categories:manage",
+                  "packages:manage",
+                  "services:manage",
+                  "gallery:manage",
+                  "offers:manage",
+                  "chatbot:manage",
+                  "reviews:manage",
+                  "bills:manage",
+                  "customers:manage",
+                  "ranking:view",
+                  "employees:manage"
+              ]
+            : []
     });
+
     await user.save();
 
     const sent = await sendOTP(email, otp);
@@ -36,6 +57,30 @@ export const loginUser = async ({ email, password }) => {
         throw Object.assign(new Error("Invalid credentials"), { statusCode: 401 });
     }
 
+    // Auto-promote: if user has no role set, check if they are the only user → promote to super_admin
+    if (!user.role || user.role === "employee") {
+        const userCount = await User.countDocuments({});
+        if (userCount === 1) {
+            user.role = "super_admin";
+            user.permissions = [
+                "dashboard:view",
+                "categories:manage",
+                "packages:manage",
+                "services:manage",
+                "gallery:manage",
+                "offers:manage",
+                "chatbot:manage",
+                "reviews:manage",
+                "bills:manage",
+                "customers:manage",
+                "ranking:view",
+                "employees:manage"
+            ];
+            await user.save();
+            logger.info(`Auto-promoted user ${user.email} to super_admin (only user in system)`);
+        }
+    }
+
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
     user.refreshToken = refreshToken;
@@ -49,8 +94,8 @@ export const loginUser = async ({ email, password }) => {
             name: user.name,
             email: user.email,
             mobile: user.mobile,
-            role: user.role,
-            permissions: user.permissions
+            role: user.role || "employee",
+            permissions: user.permissions || []
         }
     };
 };
