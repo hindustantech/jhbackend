@@ -121,7 +121,7 @@ export const createReview = async (req, res, next) => {
             userAgent: req.headers["user-agent"] || ""
         });
 
-        sendWhatsAppTemplate(normalizedPhone, "Valued Customer", "15")
+        sendWhatsAppTemplate(normalizedPhone, reviewerName || "Valued Customer", "15")
             .then((result) => {
                 if (result.ok) {
                     logger.info(`WhatsApp offer sent to phone ${normalizedPhone} after review submission`);
