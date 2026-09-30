@@ -71,6 +71,11 @@ const reviewSchema = new mongoose.Schema(
             of: String,
             default: {}
         },
+        reviewerName: {
+            type: String,
+            trim: true,
+            default: ""
+        },
         ipAddress: {
             type: String,
             default: ""

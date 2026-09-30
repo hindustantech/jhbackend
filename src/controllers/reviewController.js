@@ -24,7 +24,8 @@ export const createReview = async (req, res, next) => {
             empName, dob, anniversaryDate,
             categories, employeeCategories,
             employees: employeesBody,
-            specialData
+            specialData,
+            reviewerName
         } = req.body;
 
         if (!rating || !phone) {
@@ -115,6 +116,7 @@ export const createReview = async (req, res, next) => {
             categories: validatedCategories,
             employeeCategories: validatedEmpCategories,
             specialData: specialData || {},
+            reviewerName: reviewerName || "",
             ipAddress: req.ip || req.connection?.remoteAddress || "",
             userAgent: req.headers["user-agent"] || ""
         });
@@ -146,6 +148,7 @@ export const createReview = async (req, res, next) => {
                 employeeCategories: review.employeeCategories,
                 dob: review.dob,
                 anniversaryDate: review.anniversaryDate,
+                reviewerName: review.reviewerName,
                 specialData: review.specialData,
                 createdAt: review.createdAt
             }
