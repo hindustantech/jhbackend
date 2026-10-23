@@ -15,6 +15,7 @@ export const config = {
     whatsappApiUrl: process.env.WHATSAPP_API_URL,
     whatsappSessionSecret: process.env.WHATSAPP_SESSION_SECRET,
     whatsappTemplateName: process.env.WHATSAPP_TEMPLATE_NAME,
+    whatsappTemplateId: process.env.WHATSAPP_TEMPLATE_ID,
     whatsappTemplateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
     whatsappTemplateImageUrl: process.env.WHATSAPP_TEMPLATE_IMAGE_URL,
     whatsappTemplateImageId: process.env.WHATSAPP_TEMPLATE_IMAGE_ID
