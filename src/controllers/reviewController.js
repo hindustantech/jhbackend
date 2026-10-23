@@ -121,7 +121,7 @@ export const createReview = async (req, res, next) => {
             userAgent: req.headers["user-agent"] || ""
         });
 
-        sendWhatsAppTemplate(normalizedPhone, reviewerName || "Valued Customer", "15")
+        sendWhatsAppTemplate(normalizedPhone, reviewerName || "Valued Customer")
             .then((result) => {
                 if (result.ok) {
                     logger.info(`WhatsApp offer sent to phone ${normalizedPhone} after review submission`);
@@ -403,7 +403,7 @@ export const deleteReview = async (req, res, next) => {
 
 export const sendWhatsApp = async (req, res, next) => {
     try {
-        const { phone, customerName, discountPercent } = req.body;
+        const { phone, customerName } = req.body;
 
         if (!phone) {
             return res.status(400).json({ ok: false, message: "Phone number is required" });
@@ -411,8 +411,7 @@ export const sendWhatsApp = async (req, res, next) => {
 
         const result = await sendWhatsAppTemplate(
             phone,
-            customerName || "Valued Customer",
-            discountPercent || "15"
+            customerName || "Valued Customer"
         );
 
         if (result.ok) {

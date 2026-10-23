@@ -1,21 +1,57 @@
 import { config } from "../config/index.js";
 import { logger } from "../config/logger.js";
 
-export const sendWhatsAppTemplate = async (phoneNumber, customerName = "Customer", discountPercent = "15") => {
-    const { whatsappApiKey, whatsappApiUrl, whatsappTemplateName, whatsappSessionSecret } = config;
+const normalizePhoneNumber = (phoneNumber) => {
+    let digits = String(phoneNumber || "").replace(/\D/g, "");
 
-    if (!whatsappApiKey || !whatsappApiUrl || !whatsappTemplateName) {
+    if (digits.length === 11 && digits.startsWith("0")) {
+        digits = digits.slice(1);
+    }
+
+    if (digits.length === 10) {
+        digits = "91" + digits;
+    }
+
+    return digits;
+};
+
+export const sendWhatsAppTemplate = async (phoneNumber, customerName = "Customer") => {
+    const {
+        whatsappApiKey,
+        whatsappApiUrl,
+        whatsappTemplateName,
+        whatsappSessionSecret,
+        whatsappTemplateLanguage,
+        whatsappTemplateImageUrl,
+        whatsappTemplateImageId
+    } = config;
+
+    if (!whatsappApiKey || !whatsappApiUrl || !whatsappTemplateName || !whatsappSessionSecret) {
         logger.warn("WhatsApp API not configured. Skipping template send.");
         return { ok: false, message: "WhatsApp API not configured" };
     }
 
-    // Normalize phone number to +91 format
-    let formattedPhone = phoneNumber.replace(/\s/g, "").replace(/^\+/, "");
-    if (!formattedPhone.startsWith("91") && formattedPhone.length === 10) {
-        formattedPhone = "91" + formattedPhone;
+    const formattedPhone = normalizePhoneNumber(phoneNumber);
+    if (!formattedPhone) {
+        logger.warn("WhatsApp template skipped: invalid phone number");
+        return { ok: false, message: "Invalid phone number" };
     }
-    if (!formattedPhone.startsWith("+")) {
-        formattedPhone = "+" + formattedPhone;
+
+    // "salon" template has an image header and a single body variable: {{1}} = customer name.
+    const payload = {
+        sessionId: whatsappSessionSecret,
+        to: formattedPhone,
+        templateName: whatsappTemplateName,
+        languageCode: whatsappTemplateLanguage,
+        templateParams: [String(customerName || "Customer").trim()]
+    };
+
+    if (whatsappTemplateImageId) {
+        payload.header = { type: "image", id: whatsappTemplateImageId };
+    } else if (whatsappTemplateImageUrl) {
+        payload.header = { type: "image", link: whatsappTemplateImageUrl };
+    } else {
+        logger.warn("WHATSAPP_TEMPLATE_IMAGE_URL/ID is not set; the template expects an image header.");
     }
 
     try {
@@ -25,24 +61,31 @@ export const sendWhatsAppTemplate = async (phoneNumber, customerName = "Customer
                 "Authorization": `Bearer ${whatsappApiKey}`,
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({
-                to: formattedPhone,
-                sessionId: config.whatsappSessionSecret,
-                templateName: whatsappTemplateName,
-                templateParams: [customerName
-                ]
-            })
+            body: JSON.stringify(payload)
         });
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
 
         if (response.ok) {
             logger.info(`WhatsApp template sent to ${formattedPhone}`);
             return { ok: true, data };
-        } else {
-            logger.error(`WhatsApp API error for ${formattedPhone}: ${JSON.stringify(data)}`);
-            return { ok: false, message: data.message || "Failed to send WhatsApp template", error: data };
         }
+
+        const apiMessage = typeof data.error === "string"
+            ? data.error
+            : data.error?.message || data.message || "Failed to send WhatsApp template";
+
+        logger.error(
+            `WhatsApp API error for ${formattedPhone}: ${JSON.stringify(data)} | request: ${JSON.stringify({
+                to: payload.to,
+                templateName: payload.templateName,
+                languageCode: payload.languageCode,
+                templateParamCount: payload.templateParams.length,
+                headerType: payload.header?.type || null,
+                hasHeaderMedia: Boolean(payload.header?.link || payload.header?.id)
+            })}`
+        );
+        return { ok: false, message: apiMessage, error: data };
     } catch (error) {
         logger.error(`WhatsApp API request failed for ${formattedPhone}:`, error);
         return { ok: false, message: "WhatsApp API request failed", error: error.message };

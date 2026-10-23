@@ -314,8 +314,7 @@
 ```json
 {
   "phone": "6202400672",
-  "customerName": "John",
-  "discountPercent": "15"
+  "customerName": "John"
 }
 ```
 
