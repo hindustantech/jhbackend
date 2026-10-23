@@ -29,8 +29,7 @@ export const sendWhatsAppTemplate = async (phoneNumber, customerName = "Customer
                 to: formattedPhone,
                 sessionId: config.whatsappSessionSecret,
                 templateName: whatsappTemplateName,
-                templateParams: [customerName,
-                    discountPercent
+                templateParams: [customerName
                 ]
             })
         });
