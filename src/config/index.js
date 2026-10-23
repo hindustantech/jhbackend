@@ -13,5 +13,6 @@ export const config = {
     nodeEnv: process.env.NODE_ENV || "development",
     whatsappApiKey: process.env.WHATSAPP_API_KEY,
     whatsappApiUrl: process.env.WHATSAPP_API_URL,
+    whatsappSessionSecret: process.env.WHATSAPP_SESSION_SECRET,
     whatsappTemplateName: process.env.WHATSAPP_TEMPLATE_NAME
 };

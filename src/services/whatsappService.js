@@ -2,7 +2,7 @@ import { config } from "../config/index.js";
 import { logger } from "../config/logger.js";
 
 export const sendWhatsAppTemplate = async (phoneNumber, customerName = "Customer", discountPercent = "15") => {
-    const { whatsappApiKey, whatsappApiUrl, whatsappTemplateName } = config;
+    const { whatsappApiKey, whatsappApiUrl, whatsappTemplateName, whatsappSessionSecret } = config;
 
     if (!whatsappApiKey || !whatsappApiUrl || !whatsappTemplateName) {
         logger.warn("WhatsApp API not configured. Skipping template send.");
@@ -27,13 +27,11 @@ export const sendWhatsAppTemplate = async (phoneNumber, customerName = "Customer
             },
             body: JSON.stringify({
                 to: formattedPhone,
+                sessionId: config.whatsappSessionSecret,
                 templateName: whatsappTemplateName,
-                variables: {
-                    body: {
-                        "Customer name": customerName,
-                        "Discount percent": discountPercent
-                    }
-                }
+                templateParams: [customerName,
+                    discountPercent
+                ]
             })
         });
 
